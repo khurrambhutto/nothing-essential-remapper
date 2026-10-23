@@ -74,7 +74,7 @@ See [docs/RESEARCH.md](docs/RESEARCH.md) for the Android contracts, source links
 
 Initial validation on 2026-10-23: `:app:testDebugUnitTest` passed all six tests and compiled the Android/Kotlin sources. XML permission-boundary checks also passed. No emulator, installable APK, or device test was run.
 
-Version 0.2.0 validation on the same date: `:app:testDebugUnitTest :app:assembleDebug` passed all 19 unit tests and produced a debug APK, installed successfully on the connected A001. Raw key delivery was observed with the previous prototype; single/double/long gesture behavior still needs physical-button confirmation. No emulator or system-package changes were used.
+Version 0.2.0 validation on the same date: `:app:testDebugUnitTest :app:assembleDebug` passed all 19 unit tests and produced a debug APK, installed successfully on the connected A001. The user then performed single, double, and long presses; screenshots confirmed the expected gesture and timing for each, with no extra single after the double or long. See the measured results in [docs/RESEARCH.md](docs/RESEARCH.md). This verifies these foreground examples on one phone, not background, lock-screen, or other firmware behavior. No emulator or system-package changes were used by the development workflow.
 
 ## License
 

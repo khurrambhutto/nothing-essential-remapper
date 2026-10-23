@@ -35,3 +35,15 @@ On 2026-10-23, the connected Nothing A001 running Android 16 displayed three DOW
 [Android ViewConfiguration](https://developer.android.com/reference/android/view/ViewConfiguration) exposes system timing preferences, including long-press and multi-press timeouts. This diagnostic version deliberately uses labeled, fixed thresholds of 300 ms for the second press after release and 600 ms for a hold, so its unit tests and physical test procedure agree. These are prototype choices, not claims about Android's defaults. A future user-facing mapper should consider adjustable timings and user accessibility preferences.
 
 A pending single is reserved when the second press starts. It resolves as a double on the second short release, or a single plus a long if the second press is held. Long recognition uses a scheduled callback and does not depend on the hardware sending repeats. Canceled input and capture cancellation reset the recognizer. All key events continue to pass through to Android unchanged.
+
+### Physical gesture checks on 2026-10-23
+
+The user performed each gesture in a separate capture on the connected CMF A001, Android 16, using version 0.2.0. ADB screenshots of the detector showed the following relative times in milliseconds. All events used key code 0 and scan code 250.
+
+| Test | Raw events | Recognized result | Assessment |
+| --- | --- | --- | --- |
+| Single | DOWN 725, UP 865 | Single at 1166 | 140 ms hold; recognition 301 ms after release, matching the 300 ms window with callback scheduling. |
+| Double | DOWN 1061, UP 1176, DOWN 1259, UP 1357 | Double at 1357 | 83 ms between first release and second press; one double with no extra single in the captured result. |
+| Long | DOWN 873, UP 2429 | Long at 1473 | Recognition exactly 600 ms after DOWN; 1556 ms total hold; release added no extra gesture. No repeat events were needed. |
+
+These are successful examples in foreground capture mode, not a reliability benchmark. Background/lock-screen behavior, OS updates, and system-package state compatibility are not established by these checks. The development workflow did not disable any Nothing packages.
