@@ -27,3 +27,11 @@ The [reference video's developer](https://www.youtube.com/watch?v=YhY94x3HL7o) a
 Do not guess a vendor key code from the video or another model. Report observed codes and verify that they correspond to deliberate Essential-button presses. A missing callback is inconclusive until accessibility connection, filtering contention, app foreground status, stock-system interception, and input-device classification have been checked.
 
 The prototype's capture privacy filter excludes virtual devices and printing keys. This can cause false negatives if the OS synthesizes the Essential key through a virtual device or maps it as a printing key. Confirm input behavior on the physical device before changing that boundary.
+
+## Physical observation and gesture prototype
+
+On 2026-10-23, the connected Nothing A001 running Android 16 displayed three DOWN / UP pairs with key code `0` (`KEYCODE_UNKNOWN`) and scan code `250` after the user's test. Version 0.2.0 uses that pair as an explicit CMF test profile. Other key codes still appear in raw capture but do not enter gesture recognition. This observation does not establish the mapping on other devices or firmware versions.
+
+[Android ViewConfiguration](https://developer.android.com/reference/android/view/ViewConfiguration) exposes system timing preferences, including long-press and multi-press timeouts. This diagnostic version deliberately uses labeled, fixed thresholds of 300 ms for the second press after release and 600 ms for a hold, so its unit tests and physical test procedure agree. These are prototype choices, not claims about Android's defaults. A future user-facing mapper should consider adjustable timings and user accessibility preferences.
+
+A pending single is reserved when the second press starts. It resolves as a double on the second short release, or a single plus a long if the second press is held. Long recognition uses a scheduled callback and does not depend on the hardware sending repeats. Canceled input and capture cancellation reset the recognizer. All key events continue to pass through to Android unchanged.

@@ -36,6 +36,7 @@ class ButtonDetectionService : AccessibilityService() {
             isVirtual = event.device?.isVirtual != false ||
                 event.flags and KeyEvent.FLAG_SOFT_KEYBOARD != 0,
             isExcludedKey = event.keyCode in excludedKeys,
+            isCanceled = event.isCanceled,
         )
         // Observe only. Pass BOTH down and up to the rest of Android unchanged.
         return false

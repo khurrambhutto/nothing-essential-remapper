@@ -79,7 +79,7 @@ private fun DetectorScreen(openAccessibilitySettings: () -> Unit) {
         ) {
             item {
                 Text("Essential button", style = MaterialTheme.typography.headlineLarge)
-                Text("Detection prototype", style = MaterialTheme.typography.titleMedium)
+                Text("Gesture prototype · v0.2.0", style = MaterialTheme.typography.titleMedium)
                 Text("${Build.MANUFACTURER} ${Build.MODEL} • Android ${Build.VERSION.RELEASE}")
             }
             item {
@@ -102,7 +102,8 @@ private fun DetectorScreen(openAccessibilitySettings: () -> Unit) {
                     style = MaterialTheme.typography.titleLarge,
                 )
                 Text("Start capture, then press and release only the physical Essential button. " +
-                    "The app reports hardware key metadata; it does not change what the button does.")
+                    "Try a single press, a quick double press, or hold for 600 ms. " +
+                    "The app only displays results; it does not change what the button does.")
                 Button(
                     enabled = state.serviceConnected,
                     onClick = { if (state.isCapturing) CaptureMonitor.stop() else CaptureMonitor.start() },
@@ -110,18 +111,37 @@ private fun DetectorScreen(openAccessibilitySettings: () -> Unit) {
                 ) {
                     Text(if (state.isCapturing) "Stop capture" else "Start 15-second capture")
                 }
-                TextButton(onClick = { CaptureMonitor.clear() }) { Text("Clear events") }
+                TextButton(onClick = { CaptureMonitor.clear() }) { Text("Clear results") }
+            }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Latest gesture", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            state.gestures.firstOrNull()?.type?.label ?: "No gesture yet",
+                            style = MaterialTheme.typography.headlineMedium,
+                        )
+                        Text("CMF test profile: key code 0, scan code 250. " +
+                            "Double press: second press starts within 300 ms of the first release. " +
+                            "Long press: hold for 600 ms.")
+                        Text("Single presses wait 300 ms to rule out a double press. " +
+                            "Stopping capture discards unfinished gestures.")
+                    }
+                }
+            }
+            items(state.gestures) { gesture ->
+                Text("${gesture.type.label}  ·  +${gesture.elapsedMs} ms")
             }
             item {
                 Text("Observed hardware events", style = MaterialTheme.typography.titleMedium)
-                Text("The Essential button's key code is not confirmed on this phone yet. " +
-                    "An event below is an observation, not automatic identification.")
+                Text("The gesture profile uses the codes observed on your CMF A001. " +
+                    "Other hardware events may appear below but do not produce gestures.")
             }
             if (state.observations.isEmpty()) {
                 item {
                     Text("No events yet. If nothing appears, Nothing OS may be intercepting the button, " +
                         "or another accessibility service may own key filtering. " +
-                        "Keep Essential Space unchanged for our first device test.")
+                        "Essential Space has not been changed by this app.")
                 }
             }
             items(state.observations) { observation ->
