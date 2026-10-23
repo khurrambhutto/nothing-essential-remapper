@@ -2,12 +2,15 @@
 package org.nothingessential.detector
 
 import android.content.Intent
+import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,10 +25,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,8 +42,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
+    private lateinit var flashlight: FlashlightController
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        flashlight = FlashlightController(this)
         enableEdgeToEdge()
         setContent {
             MaterialTheme(
@@ -48,7 +56,7 @@ class MainActivity : ComponentActivity() {
                     surface = Color(0xFFF7F7F7),
                 ),
             ) {
-                DetectorScreen {
+                DetectorScreen(flashlight) {
                     startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                 }
             }
@@ -57,19 +65,33 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        flashlight.activate()
+        CaptureMonitor.attachFlashlight(flashlight::toggle, flashlight::turnOffOwnedLight)
         CaptureMonitor.setForeground(true)
     }
 
     override fun onPause() {
         CaptureMonitor.setForeground(false)
+        CaptureMonitor.attachFlashlight(null, null)
+        flashlight.deactivate()
         super.onPause()
     }
 }
 
 @Composable
-private fun DetectorScreen(openAccessibilitySettings: () -> Unit) {
+private fun DetectorScreen(flashlight: FlashlightController, openAccessibilitySettings: () -> Unit) {
     val state by CaptureMonitor.state.collectAsState()
+    val flash by flashlight.state.collectAsState()
+    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        flashlight.activate()
+    }
     var showDisclosure by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(flash.available, flash.permissionGranted) {
+        if ((!flash.available || !flash.permissionGranted) && CaptureMonitor.state.value.actionsEnabled) {
+            CaptureMonitor.setActionsEnabled(false)
+        }
+    }
 
     Scaffold { insets ->
         LazyColumn(
@@ -79,8 +101,36 @@ private fun DetectorScreen(openAccessibilitySettings: () -> Unit) {
         ) {
             item {
                 Text("Essential button", style = MaterialTheme.typography.headlineLarge)
-                Text("Gesture prototype · v0.2.0", style = MaterialTheme.typography.titleMedium)
+                Text("Flashlight prototype · v0.3.0", style = MaterialTheme.typography.titleMedium)
                 Text("${Build.MANUFACTURER} ${Build.MODEL} • Android ${Build.VERSION.RELEASE}")
+            }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Double press → flashlight", style = MaterialTheme.typography.titleLarge)
+                        Text(flash.message)
+                        Text("Android requires camera permission for flashlight access. " +
+                            "This app uses only the torch API; it does not take photos or record video.")
+                        if (!flash.permissionGranted) {
+                            OutlinedButton(onClick = { cameraPermission.launch(Manifest.permission.CAMERA) }) {
+                                Text("Allow flashlight access")
+                            }
+                            Text("If permission is denied permanently, allow Camera in Android's App info permissions.")
+                        }
+                        Text("Enable actions")
+                        Switch(
+                            checked = state.actionsEnabled,
+                            enabled = state.actionsEnabled || (flash.available && flash.permissionGranted && !flash.busy),
+                            onCheckedChange = { CaptureMonitor.setActionsEnabled(it) },
+                        )
+                        Text("Off by default. Enable, then start capture. Only double press toggles " +
+                            "the flashlight; single and long press stay diagnostic. " +
+                            "While enabled, this app consumes the test button's presses and releases " +
+                            "during capture to try to prevent Essential Space opening.")
+                        Text("Changing this switch stops capture. Leaving this screen disables actions. " +
+                            "Stopping capture turns off a light this app enabled.")
+                    }
+                }
             }
             item {
                 Card(Modifier.fillMaxWidth()) {
@@ -103,7 +153,8 @@ private fun DetectorScreen(openAccessibilitySettings: () -> Unit) {
                 )
                 Text("Start capture, then press and release only the physical Essential button. " +
                     "Try a single press, a quick double press, or hold for 600 ms. " +
-                    "The app only displays results; it does not change what the button does.")
+                    if (state.actionsEnabled) "Double press will toggle the flashlight during capture."
+                    else "Actions are off; button events pass through normally.")
                 Button(
                     enabled = state.serviceConnected,
                     onClick = { if (state.isCapturing) CaptureMonitor.stop() else CaptureMonitor.start() },
@@ -157,7 +208,7 @@ private fun DetectorScreen(openAccessibilitySettings: () -> Unit) {
                 Text("Capture stops after 15 seconds or when you leave this screen. " +
                     "Typing, virtual, volume, power, and common navigation keys are ignored. " +
                     "Events stay in memory until cleared or the process ends. " +
-                    "No internet access, screen reading, remapping, or system changes.")
+                    "No internet access, screen reading, or system-package changes.")
             }
         }
     }
@@ -171,6 +222,9 @@ private fun DetectorScreen(openAccessibilitySettings: () -> Unit) {
                     "During a capture it displays non-typing key codes, scan codes, press/release, " +
                     "repeat counts, and relative times. It does not request screen content, " +
                     "store files, or send data. Filtering is requested only during a foreground capture. " +
+                    "With Enable actions on, it consumes the test button's events during capture " +
+                    "and uses double press to toggle the flashlight. A matching release is still " +
+                    "consumed if capture ends while the button is held. " +
                     "You can disable the service in Android settings at any time.")
             },
             confirmButton = {

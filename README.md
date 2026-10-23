@@ -1,13 +1,14 @@
 # Nothing Essential Detector
 
-A free, open-source Android prototype for observing the physical Essential button and recognizing its gestures on a CMF Phone 2 Pro. It does not remap the button or run actions. It is an independent project, not affiliated with Nothing or Essential Remapper.
+A free, open-source Android prototype for recognizing the Essential button's gestures on a CMF Phone 2 Pro, with an optional double-press flashlight action. It is an independent project, not affiliated with Nothing or Essential Remapper.
 
 ## Current scope
 
 - Manually start a 15-second capture while the app is visible.
 - Display key code, scan code, DOWN / UP, repeat count, and relative capture time.
 - Display single, double, and long presses for the CMF test profile: key code `0`, scan code `250`, observed on the connected A001 phone.
-- Pass every event through unchanged. Essential Space may still open.
+- Actions are off by default. In this mode, pass every event through unchanged.
+- With actions enabled, consume the CMF test key during capture and toggle the flashlight on double press. Single and long presses only display results.
 - Stop capture on timeout, leaving the activity, service interruption, or disconnection.
 - Keep at most 32 observations in process memory. Clear them on demand; no disk logs or network access.
 - Ignore printing keys, virtual input devices, software-keyboard events, volume/power, and common navigation/typing control keys.
@@ -25,6 +26,18 @@ Raw capture still reports candidate non-typing hardware events. Only key code `0
 
 Recognition is a pure Kotlin state machine. Handler callbacks wake it at the next deadline; no polling or background actions are used. Timing uses Android's monotonic uptime clock. Thresholds are fixed in this prototype.
 
+## Flashlight experiment
+
+1. Tap **Allow flashlight access** and grant Android's Camera permission. This app uses the torch API without opening a camera or recording images/video.
+2. Turn on **Enable actions**, then start capture. Changing the switch stops any existing capture.
+3. Double press to turn the flashlight on. Wait for the reported state to settle, then double press again to turn it off. Camera callbacks confirm the state; an unavailable or busy torch does not accept another toggle.
+4. Check whether Essential Space stays closed. Consuming events is an experiment on this firmware, not a guarantee that Nothing's system handler is suppressed.
+5. Single and long presses should remain diagnostic. Other buttons should retain their normal behavior.
+
+The switch resets off when leaving the activity. Stopping capture, switching actions off, clearing results, or leaving the screen attempts to turn off a light this app last enabled. It leaves a light already on before this app's actions alone. If cleanup fails, the UI directs the user to Android Quick Settings. No root, package disabling, background actions, or automatic permission grants are used.
+
+For consistent Android input, a consumed DOWN retains the same consumption decision for repeats and its matching UP, including when capture stops during a hold. Filtering can briefly remain enabled to finish that pair, with actions disabled. Unrelated events pass through. Service disconnection clears the pairing state.
+
 The existing [UI specification](UI-SPEC.md) describes a possible future app. Those features are outside this prototype.
 
 ## Stack
@@ -33,7 +46,7 @@ Kotlin, Jetpack Compose Material 3, an Android AccessibilityService, and an in-m
 
 ## Permission model
 
-The accessibility service is protected by Android's `BIND_ACCESSIBILITY_SERVICE` permission. The source manifest requests no app permissions; AndroidX adds an app-specific signature permission for protecting internal receivers during manifest merging. It grants no internet, storage, or screen access. The service declares key-filtering capability, but requests filtering only during capture. It does not request window-content access, screen-event subscriptions, screenshots, gesture injection, or overlays. `onKeyEvent()` always returns `false`, so it never consumes events.
+The accessibility service is protected by Android's `BIND_ACCESSIBILITY_SERVICE` permission. The source manifest requests `CAMERA` solely for optional torch control; the user grants it through Android's runtime permission dialog. AndroidX also adds an app-specific signature permission for protecting internal receivers. No internet, storage, or screen-access permissions are requested. Key filtering is requested during capture, with a brief exception to finish an already consumed press/release pair. It does not request window-content access, screen-event subscriptions, screenshots, gesture injection, or overlays. Only the CMF test key is consumed when actions are explicitly enabled; everything else passes through.
 
 Before opening accessibility settings, the app explains exactly what metadata it displays and asks the user to continue. The service can be turned off in Android settings. It is correctly declared as `isAccessibilityTool="false"`.
 
@@ -75,6 +88,8 @@ See [docs/RESEARCH.md](docs/RESEARCH.md) for the Android contracts, source links
 Initial validation on 2026-10-23: `:app:testDebugUnitTest` passed all six tests and compiled the Android/Kotlin sources. XML permission-boundary checks also passed. No emulator, installable APK, or device test was run.
 
 Version 0.2.0 validation on the same date: `:app:testDebugUnitTest :app:assembleDebug` passed all 19 unit tests and produced a debug APK, installed successfully on the connected A001. The user then performed single, double, and long presses; screenshots confirmed the expected gesture and timing for each, with no extra single after the double or long. See the measured results in [docs/RESEARCH.md](docs/RESEARCH.md). This verifies these foreground examples on one phone, not background, lock-screen, or other firmware behavior. No emulator or system-package changes were used by the development workflow.
+
+Version 0.3.0 host validation on the same date: all 27 unit tests passed and the debug APK built successfully. New tests cover consistent press/release consumption, repeats, unrelated keys, device identity, and capture ending during a hold. Source permission checks confirm Camera is the only requested app permission and screen-content access remains disabled. Flashlight output and Essential Space suppression still require a physical test; the phone disconnected before installation of this version.
 
 ## License
 

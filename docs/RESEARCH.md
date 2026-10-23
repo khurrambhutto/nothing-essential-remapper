@@ -47,3 +47,13 @@ The user performed each gesture in a separate capture on the connected CMF A001,
 | Long | DOWN 873, UP 2429 | Long at 1473 | Recognition exactly 600 ms after DOWN; 1556 ms total hold; release added no extra gesture. No repeat events were needed. |
 
 These are successful examples in foreground capture mode, not a reliability benchmark. Background/lock-screen behavior, OS updates, and system-package state compatibility are not established by these checks. The development workflow did not disable any Nothing packages.
+
+## Version 0.3.0 torch and event-consumption experiment
+
+[CameraManager.setTorchMode](https://developer.android.com/reference/android/hardware/camera2/CameraManager#setTorchMode(java.lang.String,boolean)) controls a flash without opening the camera. Flash availability and actual on/off state are reported through [TorchCallback](https://developer.android.com/reference/android/hardware/camera2/CameraManager.TorchCallback). Camera resources can be busy or unavailable, and the API gives no exclusive ownership. The app registers/unregisters the callback with activity visibility, selects a rear flash-capable camera, requests Camera permission explicitly, and reports failures without assuming the requested state was applied.
+
+Actions require an enabled switch, foreground activity, and an unexpired capture. A recognized double press makes one toggle request if the torch is ready; single and long presses make none. Stop/exit disables pending gestures and attempts to turn off a light last enabled by this app. The switch resets on leaving the activity and is not stored.
+
+The [onKeyEvent contract](https://developer.android.com/reference/android/accessibilityservice/AccessibilityService#onKeyEvent(android.view.KeyEvent)) requires consistent DOWN/UP consumption. A separate tested gate fixes each CMF key pair's decision on its initial DOWN and tracks device identity. If capture ends mid-hold, only the already consumed pair drains through repeats and UP; no background actions run. The gate does not consume unrelated keys or orphan releases. This replaces the earlier prototype's unconditional pass-through only when actions are enabled.
+
+Whether consuming the test key suppresses Essential Space must be checked on the phone. No Nothing system packages are disabled by this implementation or installation workflow.
