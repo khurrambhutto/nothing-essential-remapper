@@ -54,6 +54,8 @@ Before opening accessibility settings, the app explains exactly what metadata it
 
 No emulator is needed. APK building, installation, and hardware testing use the connected CMF Phone 2 Pro.
 
+Current device experiment: the user authorized disabling stock Essential Space for Android user 0 after it still opened during the flashlight test. See [docs/DEVICE-TEST.md](docs/DEVICE-TEST.md) for the exact change and restore command. The app itself does not change system packages.
+
 1. Open this folder in Android Studio or set `ANDROID_HOME` to an installed Android SDK. Install SDK platform 37 if needed. Use JDK 17.
 2. When ready, build with `./gradlew :app:assembleDebug`.
 3. Connect the phone by USB, enable USB debugging, and authorize this computer on the phone.
