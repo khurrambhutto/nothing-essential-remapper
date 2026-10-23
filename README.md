@@ -52,6 +52,8 @@ The torch API does not require Camera permission on stock Android. Version 0.4.0
 
 The existing [UI specification](UI-SPEC.md) describes a possible future app, not the current feature set.
 
+The user's full timestamped [reference-video transcript](docs/reference/essential-remapper-transcript.txt) is saved verbatim. See [reference notes](docs/reference/README.md) for provenance and the distinction between product inspiration and verified Android behavior.
+
 ## Stack
 
 Kotlin, Jetpack Compose Material 3, an Android AccessibilityService, and an in-memory StateFlow. Android 12 / API 31 or later, compile SDK 37, target SDK 36, JDK 17. AGP 9.4.1 with built-in Kotlin; Compose compiler plugin 2.4.21; Gradle wrapper 9.7.1 with a pinned distribution checksum. No root, Shizuku, ADB client, database, analytics, or custom fonts in the app.

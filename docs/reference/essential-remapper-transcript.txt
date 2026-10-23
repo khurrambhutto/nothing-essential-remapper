@@ -1,0 +1,330 @@
+0:00 If there is one software [music] feature
+0:01 that the nothing community has been
+0:03 asking for well since the release of the
+0:04 3A and 3A Pro, it's the ability to make
+0:08 the essential button. Just do whatever
+0:10 you want. And there are a few
+0:11 workarounds that a lot of us have been
+0:13 using. However, nothing felt integrated.
+0:17 Pun intended. So last year [music] after
+0:19 the release of the Phone 3, I've set
+0:20 myself a target to make an app that does
+0:23 exactly that. An app that allows you to
+0:25 easily [music] disable the essential
+0:26 space. remap the button to whatever
+0:29 action you want with multiple gesture
+0:31 support [music] and most importantly
+0:33 feel close to how I think nothing should
+0:35 have actually implemented it. So after
+0:37 months of working on it, I'm happy to
+0:39 announce that Essential Remapper [music]
+0:40 is finally live on the Play Store. For
+0:43 those of you who want to know all of the
+0:44 intricate details, like for example, if
+0:46 the app will affect the battery life in
+0:48 any way and what else is planned for the
+0:50 future, stick around and [music] I'll
+0:52 also randomly pop on the screen a few
+0:54 codes like this one right here that will
+0:56 give you the app completely for free.
+0:59 When you're first going to open the app,
+1:00 it will identify and let you know the
+1:02 phone you're running it on. Now, this
+1:04 whole step here exists for [music] a
+1:05 couple of reasons. All of the nothing
+1:07 and CMF phones with an essential button
+1:09 are already supported at launch with the
+1:11 exception of the just announced [music]
+1:13 phone 4B which support for it will come
+1:15 very soon. But even if your nothing
+1:18 device isn't recognized, I thought about
+1:20 it and implemented the option other
+1:22 nothing/ CMF phone on the selection
+1:25 screen which you can pick and you're
+1:27 ready to go. The one small trade is
+1:29 [music] that you'll have to change the
+1:31 overlay indicators position to match the
+1:33 placement where the button actually is
+1:35 on your specific phone. You'll be able
+1:37 to easily do so in settings device. The
+1:41 app will get updated pretty quickly, but
+1:43 if nothing releases a new phone, I
+1:45 obviously need a tiny [music] bit of
+1:46 time to properly check the overlay
+1:48 position on that new specific phone.
+1:50 Second of all, a few of you will run
+1:52 custom ROMs on their phone. And if your
+1:54 ROM reports [music] a different device
+1:56 name or a different model number and the
+1:58 app doesn't recognize it, you'll still
+2:00 be able to manually pick from all of the
+2:02 supported nothing devices that have an
+2:04 essential button. And third of all, I
+2:06 know there will be many who will ask if
+2:07 this app works with other Android
+2:09 devices. And technically, the app
+2:12 doesn't limit you in any way, but a lot
+2:14 of Android manufacturers just don't
+2:16 allow taking control that additional
+2:18 button for apps that easily. If the app
+2:21 gets enough attention though, I would
+2:22 definitely love to take this further and
+2:24 make it work on other phones. Now, the
+2:27 next step in the process will [music] be
+2:29 disabling the Essential Space app, which
+2:31 you can do using one of the three
+2:32 different methods. There's the built-in
+2:34 one, which works a lot like the Shizuku
+2:36 one, but without needing any extra apps
+2:39 installed. [music]
+2:39 Then there's Shizuku itself for anyone
+2:41 who already has it set up and would
+2:43 rather go that route. The only
+2:45 requirement for the built-in method and
+2:47 the shipping one is that you'll have to
+2:49 be connected to a Wi-Fi network. And
+2:51 finally, the classic [music] way, just
+2:52 typing the command into an ADB terminal
+2:54 yourself. Let's go ahead with the
+2:56 built-in one since [music] it's the one
+2:58 I'd recommend to most of you. And I
+2:59 promise you, it's not as complicated as
+3:02 it looks. You grant a notification
+3:03 permission, which [music] just so you
+3:05 know is only there to make the setup
+3:07 process work. You'll never get any
+3:09 random notifications from the app. Then
+3:11 you enable developer options if you
+3:13 haven't already. on nothing OOS. You do
+3:15 that by heading over to the about phone
+3:17 section [music] in settings, which the
+3:19 app can take you directly there. Tap on
+3:21 nothing OS version [music] and then tap
+3:23 on your bill number seven times. If you
+3:26 have a passcode on, you're going to have
+3:28 to type it in here. After that, you can
+3:31 go back to the Essential Remapper app
+3:33 and you'll see that the next step is
+3:35 enabling wireless debugging. To do so,
+3:37 [music] just tap on open. Scroll a bit
+3:40 until you see the wireless debugging
+3:41 option and turn it on. And the final
+3:45 step, tap to open the wireless debugging
+3:47 section and select pair device with
+3:50 pairing code. You'll see that the
+3:52 Essential Remapper app has already found
+3:54 the pairing service. And what you'll
+3:57 have to do is type the six-digit code
+3:59 into that notification. And that's about
+4:02 it. You can now go back to the Essential
+4:04 Remapper app and you're going to see
+4:06 that the essential [music] space has
+4:07 been disabled. I also know that there
+4:09 will be some people who would like to
+4:11 use the essential remapper app in
+4:13 combination with the essential space,
+4:14 but I unfortunately have some bad news.
+4:17 Without going super technical, nothing
+4:19 basically hijacks this button at the
+4:21 system level as it's built directly into
+4:23 their flavor of Android. And the only
+4:25 realistic path [music] that I could make
+4:26 it work is with root or by creating a
+4:29 custom ls module, [music] which I know
+4:32 99% of you or probably even more
+4:35 wouldn't bother doing. However, if at
+4:37 any point you'll want to go back to
+4:39 using the essential space, you'll be
+4:40 able to enable it back super easily in
+4:43 settings [music] using any of those
+4:44 three methods again. After that, the
+4:47 rest of the setup is honestly the
+4:49 [music] easy part. The first one is
+4:51 granting the accessibility permission.
+4:52 And the only thing essential remapper
+4:54 uses it for is to detect when you press
+4:56 the essential button. It's not reading
+4:58 what's on your screen. There are no
+5:00 analytics, no tracking, nothing. Next,
+5:03 it will ask you to turn off battery
+5:05 optimizations for the app. This one just
+5:07 stops Android from killing the app in
+5:09 the background. And as I'll show you
+5:10 later in the video, you'll see that the
+5:12 app barely drains any battery. In fact,
+5:15 from all of my testing, the Essential
+5:17 Space app actually uses more battery if
+5:19 it's just running in the background.
+5:21 Then, in the next step, just simply
+5:23 press your Essential button for the app
+5:25 to [music] identify it. And finally,
+5:27 you'll pick a couple of quick
+5:29 preferences, whether you want haptic
+5:30 feedback and which visual overlay style
+5:33 you'd prefer. Though, don't overthink
+5:35 anything over here since you can change
+5:37 all of this later in settings. [music]
+5:39 And just like that, your setup is done.
+5:42 In terms of design, I've got both
+5:44 material U and material 3 integrated
+5:46 with all of the predictive back gesture
+5:48 animations, but with that slight nothing
+5:51 font touch. And just in case somebody
+5:53 from nothing is watching this, I promise
+5:55 you that I haven't ripped your font
+5:56 [music] out of the system and bundled it
+5:58 into the app. The app simply detects
+5:59 whether the phone already has the font
+6:01 installed and uses it with a fallback to
+6:04 a completely open- source font that's
+6:06 very similar to dot matrix. And you can,
+6:08 by the way, manually just use that one
+6:10 if you prefer it. But going back to the
+6:12 homepage, so over here at the top,
+6:14 you'll have three different button
+6:16 mappingss that you'll be able to
+6:17 customize. Single press, double press,
+6:20 and [music] long press. I might
+6:22 potentially add in the future even more
+6:23 button combinations for those specific
+6:25 users, but we'll see. I've included
+6:28 quick actions at the top, like toggling
+6:30 the flashlight or the rotation lock,
+6:33 controlling your media.
+6:35 And you can also launch your own apps.
+6:38 And if you want to go deeper, you can
+6:40 even launch app specific shortcuts or
+6:42 deep links that go straight into a
+6:44 specific app [music] screen. Now, my
+6:46 personal favorite part, and honestly the
+6:48 part I probably spend the most amount of
+6:50 time to get right, is the visual
+6:52 overlay. This whole concept started from
+6:54 this one single nothing screenshot. I
+6:56 think it's a mockup they showed off for
+6:58 the essential button early on, and it
+7:00 evolved into [music] this. Every time
+7:02 you press the button, you get this
+7:04 onscreen visual indicator. One is
+7:06 inspired by nothing's aesthetic, and the
+7:08 other one is a cleaner stock [music]
+7:10 Android style that looks exactly the
+7:12 same as the volume pop-up UI.
+7:16 And below that, you can further
+7:17 customize them to your liking, like for
+7:19 instance, changing your color or
+7:21 disabling the glow effect. I also have
+7:23 extra plans for adding further
+7:25 customizations. [music]
+7:26 And by the way, the overlay icons that
+7:28 are inside, they are state aware. So the
+7:30 icon actually reflects what's happening.
+7:33 For example, flashlight on or off,
+7:37 rotation locked and unlocked. Little
+7:40 things, but they add up. Now, if I can
+7:43 nerd out for a bit though, getting that
+7:45 overlay to sit perfectly was way harder
+7:48 than it looks because the placement has
+7:49 to be done individually on every single
+7:51 Nothing phone. Almost every model has
+7:53 the essential button in a slightly
+7:55 different spot. So, I had to tune the
+7:57 position for each one by hand. And you
+8:00 wouldn't believe the headache I had with
+8:01 the rotation because when you rotate the
+8:04 phone, the overlay needs to stay
+8:06 anchored to the exact same physical spot
+8:08 next to the button, which [music] you'd
+8:10 think it's easier than it sounds, but
+8:13 nope. Beyond that, I really wanted this
+8:16 to feel like your own button, so I gave
+8:18 you quite a few options for extra
+8:20 customization. For example, by default,
+8:22 none of the gestures will trigger while
+8:24 your phone is locked. Mainly so that the
+8:26 button can't accidentally go off in your
+8:29 pocket. But if you do want a specific
+8:30 gesture to work even when your phone is
+8:33 locked, say maybe a double press for
+8:35 flashlight, you can enable that
+8:36 individually. Now, I will be honest
+8:38 about one small limitation here. The
+8:41 screen does still light up briefly even
+8:43 if the gestures on lock screen are
+8:45 disabled. That's sadly just a
+8:47 limitation. Again, that's probably just
+8:49 fixable with root. You can also dial in
+8:51 the gesture timings until they feel
+8:53 right. For example, how quickly a double
+8:56 press [music] has to be or how long you
+8:58 need to hold for a long press. And for
+9:00 the haptics, you can tap through the
+9:01 intensity levels to feel each one right
+9:04 there.
+9:05 [music]
+9:06 And if we hop into the settings, one
+9:09 particular feature which I still want to
+9:11 highlight is that the app has full
+9:13 backup and import support. So, say
+9:15 you've spent a while configuring
+9:17 everything and then you get a new
+9:18 nothing device. You just export your
+9:20 settings,
+9:22 import them on the new phone,
+9:25 and you're done. It saves everything as
+9:28 a simple JSON file, so it's yours to
+9:31 keep. Now, I know what some of you are
+9:33 going to ask because [music] the app
+9:35 technically has to live in the
+9:36 background to detect the button. What
+9:39 does that do to the battery life? I've
+9:41 spent quite a lot of time optimizing the
+9:43 app. [music] So the only absolute
+9:45 necessary stuff is running in the
+9:47 background. Even the overlay itself is
+9:50 smartly introduced and the activity for
+9:52 it only stays active for about 10
+9:54 seconds after the animation finishes
+9:56 just in case you press the button a few
+9:59 times in a row. And if you want the
+10:01 actual numbers using the task manager
+10:03 app on Android, the estimated CPU usage
+10:06 when the overlay is actually on sits at
+10:09 around 5%.
+10:11 [music]
+10:11 And this is on the CMF phone, too, by
+10:13 the way. And honestly, there are so many
+10:15 apps out there that shouldn't be
+10:17 consuming any background activity, yet
+10:19 they happily chew through way more than
+10:21 they should. Okay, let's talk about the
+10:24 part that nobody loves talking about,
+10:27 money. As much as I would absolutely
+10:29 [music] love to make this app completely
+10:31 for free, realistically, if I want to
+10:33 actually sustain it and keep improving
+10:35 it, there has to be some kind of income
+10:37 behind it. I know the industry seems to
+10:40 be moving more and more to subscription
+10:41 style apps, but I really didn't want to
+10:43 go their route because I just genuinely
+10:45 hate them. So, I settled on a onetime
+10:47 payment of seven bucks, which means
+10:49 instead of buying yourself one
+10:51 overpriced cup of coffee, maybe treat
+10:53 yourself with the app instead. It will
+10:55 last a lot longer than that caffeine.
+10:58 I genuinely spend so much time refining
+11:01 every little detail in the app, and this
+11:04 is just a start. There's way more that I
+11:06 want to add, more devices, and I have a
+11:08 few ideas that I'm really excited about.
+11:11 And to keep you all in the loop about
+11:12 the app without spamming this channel
+11:14 with it, I've actually set up a
+11:16 dedicated YouTube channel [music] just
+11:18 for Essential Remapper. So, anything app
+11:20 related, we'll probably leave over
+11:22 there. And if you did end up grabbing
+11:24 it, thank you. I hope you enjoyed as
+11:26 much as I did making it.
