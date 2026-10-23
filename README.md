@@ -56,7 +56,9 @@ The user's full timestamped [reference-video transcript](docs/reference/essentia
 
 ## Stack
 
-Kotlin, Jetpack Compose Material 3, an Android AccessibilityService, and an in-memory StateFlow. Android 12 / API 31 or later, compile SDK 37, target SDK 36, JDK 17. AGP 9.4.1 with built-in Kotlin; Compose compiler plugin 2.4.21; Gradle wrapper 9.7.1 with a pinned distribution checksum. No root, Shizuku, ADB client, database, analytics, or custom fonts in the app.
+Kotlin, Jetpack Compose Material 3 Expressive (`material3` 1.5.0-beta02), an Android AccessibilityService, and an in-memory StateFlow. Android 12 / API 31 or later, compile SDK 37, target SDK 36, JDK 17. AGP 9.4.1 with built-in Kotlin; Compose compiler plugin 2.4.21; Gradle wrapper 9.7.1 with a pinned distribution checksum. No root, Shizuku, ADB client, database, analytics, or custom fonts in the app.
+
+The UI theme lives in `app/src/main/java/org/nothingessential/detector/ui/theme/Theme.kt`. It uses `MaterialExpressiveTheme` with a neutral light/dark baseline, so standard controls inherit the expressive shape and motion defaults. Change the palette, typography, or shapes there to apply a custom design instead of styling individual controls.
 
 ## Permission model
 

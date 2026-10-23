@@ -8,7 +8,7 @@
         android:allowBackup="false"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:theme="@style/Theme.NothingEssential">
         <receiver android:name=".BackgroundControlReceiver" android:exported="false" />
         <activity
             android:name=".MainActivity"
