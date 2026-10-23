@@ -24,7 +24,7 @@ This passes the current foreground flashlight experiment on this phone with Esse
 
 Version 0.4.0 installed on A001 after 35 host unit tests passed. The Android-bound accessibility service is running. Notification permission is initially denied, background control is off by default, and Camera permission is no longer declared. Essential Space remains disabled; the recorder package has not been changed by this workflow.
 
-Physical checks still pending:
+Physical check protocol:
 
 1. Unlock, open the detector, allow status notifications, then enable actions and **Use in other apps**.
 2. Confirm the ongoing notification appears. Press Home, use another app, and double press the Essential button to toggle on, then off. Wait beyond 15 seconds and repeat to check independence from diagnostic capture.
@@ -32,7 +32,11 @@ Physical checks still pending:
 4. Reenable background mode, then turn off/lock the screen. Verify no button action runs and any app-enabled light turns off. Unlock and verify a fresh double press works, without any stale gesture from before lock.
 5. Confirm ordinary keys and the Camera app remain usable; camera resource conflicts should show an unavailable status rather than crash or retry continuously.
 
-These checks are a protocol, not completed results. No service persistence or lock-screen action is claimed from the host tests alone.
+### Background test result
+
+On 2026-10-23, the user reported that background control worked. ADB screenshots confirmed notification permission granted, Service connected, and eight retained double presses at 1420, 4919, 5709, 6887, 13033, 13985, 15187, and 16024 ms relative to monitoring start. Results beyond 15000 ms demonstrate recognition continuing past the diagnostic capture limit. The flashlight was reported off at inspection, with both control switches off. The user's report is the evidence for physical light behavior while using other apps; screenshots inspect the retained results rather than independently recording that whole interaction.
+
+The unlocked background toggle test is user-confirmed. The inspection does not establish which Stop control was used. Dedicated notification Stop, lock/pause/resume, camera-conflict, reboot, and long-term service survival checks remain pending. No lock-screen flashlight action is implemented or claimed.
 
 To restore the original package state on the same phone and Android user:
 
