@@ -19,6 +19,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import java.io.FileDescriptor
+import java.io.PrintWriter
 
 class ButtonDetectionService : AccessibilityService() {
     private val consumption = KeyConsumptionGate()
@@ -28,7 +30,13 @@ class ButtonDetectionService : AccessibilityService() {
     private lateinit var notification: BackgroundModeNotification
     private var receiverRegistered = false
     private val screenReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) { CaptureMonitor.refreshEnvironment() }
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                Intent.ACTION_SCREEN_ON -> CaptureMonitor.onScreenWake()
+                Intent.ACTION_SCREEN_OFF -> CaptureMonitor.onScreenSleep()
+                else -> CaptureMonitor.refreshEnvironment()
+            }
+        }
     }
 
     override fun onServiceConnected() {
@@ -40,11 +48,7 @@ class ButtonDetectionService : AccessibilityService() {
             captureRequestsFiltering = enabled
             if (!enabled) consumption.discardPassThroughPresses()
             updateFiltering()
-        }, unlocked = {
-            val keyguard = getSystemService(KeyguardManager::class.java)
-            getSystemService(PowerManager::class.java).isInteractive &&
-                !keyguard.isKeyguardLocked && !keyguard.isDeviceLocked
-        }, notificationsAllowed = notification::allowed,
+        }, unlocked = ::deviceUnlocked, notificationsAllowed = notification::allowed,
             toggle = flashlight::toggle, cleanup = flashlight::turnOffOwnedLight)
         if (!receiverRegistered) {
             val filter = IntentFilter().apply {
@@ -108,6 +112,29 @@ class ButtonDetectionService : AccessibilityService() {
             eventTypes = 0
             // Finish consuming an already claimed pair even if capture ends during a hold.
             flags = requestedFlags
+        }
+    }
+
+    private fun deviceUnlocked(): Boolean {
+        val keyguard = getSystemService(KeyguardManager::class.java)
+        return getSystemService(PowerManager::class.java).isInteractive &&
+            !keyguard.isKeyguardLocked && !keyguard.isDeviceLocked
+    }
+
+    /** Read-only adb diagnostics, without attaching UI automation or interrupting accessibility. */
+    override fun dump(fd: FileDescriptor, writer: PrintWriter, args: Array<out String>?) {
+        val state = CaptureMonitor.state.value
+        writer.println("serviceConnected=${state.serviceConnected}")
+        writer.println("actionsEnabled=${state.actionsEnabled}")
+        writer.println("backgroundEnabled=${state.backgroundEnabled}")
+        writer.println("monitorUnlocked=${state.unlocked}")
+        writer.println("deviceUnlocked=${deviceUnlocked()}")
+        writer.println("captureActive=${state.isCapturing}")
+        writer.println("gestureCount=${state.gestures.size}")
+        if (::flashlight.isInitialized) {
+            val torch = flashlight.state.value
+            writer.println("flashlightAvailable=${torch.available}")
+            writer.println("flashlightOn=${torch.isOn}")
         }
     }
 

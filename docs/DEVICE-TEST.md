@@ -51,3 +51,27 @@ adb -s SERIAL shell dumpsys package com.nothing.ntessentialspace
 ```
 
 Look for `User 0` with `enabled=0`. The detector app does not perform this package change or restoration itself.
+
+## Version 0.4.1 pause/resume and Stop checks
+
+On 2026-10-23, a screen-off/wake test on v0.4.0 exposed a stale paused state: Android reported the current device unlocked while the app still displayed paused. A deterministic host regression reproduced the missing follow-up state check twice before the fix. SCREEN_ON may precede keyguard dismissal without another USER_PRESENT notification reaching the monitor. Version 0.4.1 performs a bounded series of checks at 100, 300, 750, 1500, and 3000 ms after wake. It never assumes unlock, and cancels checks on Stop, screen-off, or confirmed unlock. Foreground readiness after wake uses the same recovery boundary.
+
+All 49 host tests passed before installation. New lifecycle tests execute the real CaptureMonitor and Handler deadlines under Robolectric, with fake lock/notification/torch callbacks. They cover pausing with a light on, resuming after unlock, clearing pending short/long presses, late unlock, bounded retries, Stop, notification revocation, service reconnect, and foreground cleanup. No emulator is used.
+
+The physical CMF check used:
+
+```sh
+python3 scripts/check-device-state.py --serial SERIAL --wake-cycle
+```
+
+Observed sequence on v0.4.1:
+
+- Active: actions/background enabled, monitor/device unlocked, no diagnostic capture, gesture count 6.
+- Screen off: actions/background still armed, monitor/device locked or noninteractive, flashlight reported off, gesture count unchanged at 6.
+- Wake: monitor/device unlocked again, actions/background still armed, gesture count still 6. The command returned PASS without reopening the app to recover.
+
+The light was off at the start of that particular cycle, so physical cleanup of an illuminated light is not established by that cycle; the corresponding host lifecycle test does start with the light on.
+
+The user then tapped the notification's Stop action. `--expect stopped` confirmed actions false, background false, flashlight false, diagnostic capture false, service still connected. Android's active notification records no longer contained the app's status notification. This verifies the delivered Stop action as well as the host receiver test.
+
+Avoid `uiautomator dump` during these checks: attaching UI automation interrupted the accessibility service in this session and disarmed background mode. The app's inherited service dump reports only its own boolean runtime state and gesture count, without reading other apps' content. Use the read-only diagnostic script and screenshots instead.

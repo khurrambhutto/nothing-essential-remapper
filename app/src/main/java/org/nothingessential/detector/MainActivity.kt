@@ -109,7 +109,7 @@ private fun DetectorScreen(
         ) {
             item {
                 Text("Essential button", style = MaterialTheme.typography.headlineLarge)
-                Text("Background prototype · v0.4.0", style = MaterialTheme.typography.titleMedium)
+                Text("Background prototype · v0.4.1", style = MaterialTheme.typography.titleMedium)
                 Text("${Build.MANUFACTURER} ${Build.MODEL} • Android ${Build.VERSION.RELEASE}")
             }
             item {

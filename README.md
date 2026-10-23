@@ -42,7 +42,7 @@ This experiment passed on the CMF A001 after the user authorized disabling stock
 3. Press Home, use another app with the phone unlocked, and double press to toggle the flashlight. Return to inspect the last 16 gesture results.
 4. Tap **Stop** in the notification, turn off either switch, or use **Stop background control** in the app to stop monitoring and turn off a light last enabled by this app. On Android versions that allow dismissing ongoing notifications, dismissing it also stops control.
 
-The system-bound accessibility service owns the torch controller using an application context. The activity can close without releasing that controller. No extra foreground service, wake lock, polling, battery-optimization exemption, camera opening, or automatic restart is added.
+The system-bound accessibility service owns the torch controller using an application context. The activity can close without releasing that controller. No extra foreground service, wake lock, continuous polling, battery-optimization exemption, camera opening, or automatic restart is added. Version 0.4.1 makes at most five short state checks during a wake transition to handle keyguard dismissal arriving after SCREEN_ON; it stops checking once unlocked, stopped, or asleep again.
 
 Screen off or lock pauses background recognition, clears pending gestures, and turns off a light last enabled by the app. Background mode stays armed and resumes after unlocking. Locked and screen-off button actions are deliberately disabled. Mode and action settings are process-local and reset off after service disconnection, force-stop, process death, reboot, or app update. Android/OEM service lifecycle behavior still needs physical testing; no guarantee of uninterrupted execution is made.
 
@@ -109,6 +109,17 @@ Version 0.2.0 validation on the same date: `:app:testDebugUnitTest :app:assemble
 Version 0.3.0 host validation on the same date: all 27 unit tests passed and the debug APK built successfully. New tests cover consistent press/release consumption, repeats, unrelated keys, device identity, and capture ending during a hold. Source permission checks confirm Camera is the only requested app permission and screen-content access remains disabled. After reconnecting the phone, version 0.3.0 installed and opened successfully on A001. The initial test briefly illuminated the light but still opened Essential Space. After the user authorized disabling that package, the user confirmed successful foreground flashlight behavior; screenshots confirmed the detector remained visible with the service connected and actions enabled. See [docs/DEVICE-TEST.md](docs/DEVICE-TEST.md) for the results, limits, and restore command. Background and lock-screen use remain untested.
 
 Version 0.4.0 host validation on 2026-10-23: all 35 unit tests passed and `:app:assembleDebug` succeeded. Source checks confirm notifications are the only requested app permission, the Stop receiver is not exported, and window-content retrieval is disabled. Version 0.4.0 installed successfully on A001; the accessibility service process is running. The phone was dozing at inspection, and notification permission is not yet granted. The user subsequently confirmed background control works. Retained history shows eight double presses, including events at 15187 and 16024 ms beyond the diagnostic timeout; inspection found both controls off and flashlight status off. Dedicated notification Stop and lock/pause/resume checks remain pending. See docs/DEVICE-TEST.md for the evidence and limits. No emulator or further system-package changes were used.
+
+Version 0.4.1 fixes background mode staying paused when SCREEN_ON precedes keyguard dismissal without a later USER_PRESENT update. Its regression failed twice before the fix; all 49 host tests now pass, including the real Handler-based monitor under Robolectric on the JVM, without an emulator. The APK installed successfully. On the physical CMF, a screen-off/wake cycle paused and resumed control with no stale gesture, and the user's notification Stop disabled both controls, left the light off, and removed the notification. Long-term service survival and lock-screen actions remain outside these results.
+
+Read-only diagnostics, which avoid UI automation interrupting accessibility:
+
+```sh
+python3 scripts/check-device-state.py --serial SERIAL
+python3 scripts/check-device-state.py --serial SERIAL --expect stopped
+```
+
+For an explicitly armed, unlocked device, `--wake-cycle` turns the screen off and on and verifies pause/resume without rearming or bypassing authentication. It checks state transitions and stale gesture counts; it does not physically measure light output.
 
 ## License
 

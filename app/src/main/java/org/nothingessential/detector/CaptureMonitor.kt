@@ -32,6 +32,7 @@ object CaptureMonitor {
     private var setKeyFiltering: ((Boolean) -> Unit)? = null
     private var checkUnlocked: (() -> Boolean)? = null
     private var canNotify: (() -> Boolean)? = null
+    private val wakeChecks = mutableListOf<Runnable>()
     private val timeout = Runnable { stop() }
     private val gestureTick = Runnable {
         refreshEnvironment()
@@ -88,12 +89,44 @@ object CaptureMonitor {
         if (mutableState.value.backgroundEnabled && canNotify?.invoke() != true) {
             setActionsEnabled(false)
         }
+        if (unlocked || (!mutableState.value.backgroundEnabled && !foreground)) cancelWakeChecks()
         publish()
+    }
+
+    /** Entry point for a SCREEN_ON transition, separate from ordinary state checks. */
+    fun onScreenWake() {
+        cancelWakeChecks()
+        refreshEnvironment()
+        if ((!mutableState.value.backgroundEnabled && !foreground) || mutableState.value.unlocked) return
+        // SCREEN_ON can precede keyguard dismissal without a later USER_PRESENT event.
+        // A bounded transition check avoids permanently paused mode and idle polling.
+        for (delay in listOf(100L, 300L, 750L, 1_500L, 3_000L)) {
+            val check = Runnable { refreshEnvironment() }
+            wakeChecks += check
+            handler.postDelayed(check, delay)
+        }
+    }
+
+    fun onScreenSleep() {
+        cancelWakeChecks()
+        handler.removeCallbacks(timeout)
+        handler.removeCallbacks(gestureTick)
+        recognizer.cancel()
+        session.stop()
+        stopFlashlight?.invoke()
+        mutableState.value = mutableState.value.copy(unlocked = false)
+        publish()
+    }
+
+    private fun cancelWakeChecks() {
+        wakeChecks.forEach { handler.removeCallbacks(it) }
+        wakeChecks.clear()
     }
 
     fun setForeground(value: Boolean) {
         foreground = value
         refreshEnvironment()
+        if (value && !mutableState.value.unlocked) onScreenWake()
         if (!value && !mutableState.value.backgroundEnabled) {
             setActionsEnabled(false)
         } else if (!value) {
@@ -137,6 +170,7 @@ object CaptureMonitor {
 
     /** Stops either mode; the user may explicitly start a new one. */
     fun stop() {
+        cancelWakeChecks()
         handler.removeCallbacks(timeout)
         handler.removeCallbacks(gestureTick)
         recognizer.cancel()
