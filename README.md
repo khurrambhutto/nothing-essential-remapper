@@ -1,129 +1,87 @@
 # Nothing Essential Detector
 
-A free, open-source Android prototype for recognizing the Essential button's gestures on a CMF Phone 2 Pro, with an optional double-press flashlight action and opt-in background control. It is an independent project, not affiliated with Nothing or Essential Remapper.
+Nothing Essential Detector is an Android prototype for the Essential button on a CMF Phone 2 Pro. It recognizes single, double, and long presses. Double press can toggle the flashlight. Background control can keep that working in other apps while the phone is unlocked.
 
-## Current scope
+Tested on one CMF A001. Not a general Essential button remapper. Nothing and Essential Remapper have no involvement.
 
-- Manually start a 15-second raw diagnostic capture, or explicitly enable background control while unlocked.
-- Display key code, scan code, DOWN / UP, repeat count, and relative capture time.
-- Display single, double, and long presses for the CMF test profile: key code `0`, scan code `250`, observed on the connected A001 phone.
-- Actions are off by default. In this mode, pass every event through unchanged.
-- With actions enabled, consume the CMF test key in the selected monitoring mode and toggle the flashlight on double press. Single and long presses only display results.
-- Stop raw capture on timeout or leaving the activity. Background mode continues across other apps, pauses on screen-off/lock, and resets off on service disconnection or process restart.
-- Keep at most 32 observations in process memory. Clear them on demand; no disk logs or network access.
-- Ignore printing keys, virtual input devices, software-keyboard events, volume/power, and common navigation/typing control keys.
+Actions are off by default. Every key passes through untouched until you enable them.
 
-Raw capture still reports candidate non-typing hardware events. Only key code `0` with scan code `250` enters gesture recognition. This is a device-specific test mapping, not a universal Nothing button identity. Press only the Essential button during a capture. Firmware that exposes it as a virtual/printing key will be excluded by the current privacy filters; investigate that on the connected phone rather than silently broadening collection.
+## What it does
 
-## Gesture behavior
+- A 15-second capture shows key code, scan code, DOWN or UP, repeat count, and elapsed time.
+- The CMF profile matches key code `0` with scan code `250`, the pair seen on the connected A001.
+- With actions on, the app consumes that key. Double press toggles the flashlight; single and long press only display results.
+- Background control is opt-in. It pauses on screen off or lock and resets off on service disconnect, force-stop, process death, reboot, or update.
+- The app keeps at most 32 hardware events and 16 gestures in memory. Nothing goes to disk or the network.
+- The filter ignores typing keys, virtual input, software keyboards, volume, power, and common navigation keys.
 
-- A short press is reported as **Single press** 300 ms after release, unless a second press starts before that deadline.
-- A second short press starting within that interval produces **Double press** on release. No extra single is produced, even if the second release occurs after the original deadline.
-- A hold reaches **Long press** after 600 ms without needing repeated DOWN events. Repeats and the eventual release add no more gestures.
-- A short click followed by a hold produces a single plus a long, rather than a double.
-- Stopping capture, leaving the activity, clearing results, a canceled key event, or losing the service discards incomplete gestures. The last instant of a capture can contain raw events with no completed gesture.
-- Gesture history holds up to 16 results in memory and resets with each capture.
+Raw capture reports non-typing hardware events. Only the CMF key reaches gesture recognition. If firmware reports the button differently, check that on the phone before widening the filter.
 
-Recognition is a pure Kotlin state machine. Handler callbacks wake it at the next deadline; no polling or background actions are used. Timing uses Android's monotonic uptime clock. Thresholds are fixed in this prototype.
+## Gestures and background
 
-## Foreground flashlight test
+- A short press becomes **Single press** 300 ms after release.
+- A second press inside that window becomes **Double press** on release.
+- A 600 ms hold becomes **Long press**.
+- A short press followed by a hold gives single then long, not double.
+- Stopping capture, leaving the screen, clearing results, a canceled key, or losing the service discards unfinished gestures.
 
-1. Enable **Enable actions**, then start the 15-second capture.
-2. Double press to turn the flashlight on, wait for status to settle, then double press again to turn it off.
-3. Single and long presses remain diagnostic. Power, volume, and unrelated keys retain their normal behavior.
-4. Stop capture to turn off a light last enabled by this app. Without background mode, leaving the activity also disables actions.
+Recognition is a pure Kotlin state machine. Handler callbacks wake it at the next deadline. Timing uses Android's monotonic uptime clock.
 
-This experiment passed on the CMF A001 after the user authorized disabling stock Essential Space. See [docs/DEVICE-TEST.md](docs/DEVICE-TEST.md) for the device change and restore command. The app does not disable system packages itself.
+Background control needs notification permission and a status notification with Stop. Turn on **Enable double press**, then **Use in other apps**. Leave the app and double press while unlocked. Stop from the notification, either switch, or **Stop background control**.
 
-## Background mode, version 0.4.0
+The accessibility service owns the torch controller, so the activity can close. There is no foreground service, wake lock, polling loop, battery exemption, camera session, or restart alarm. Screen off or lock pauses actions and turns off a light this app turned on. Android and the OEM control service lifecycle, so uninterrupted execution is not guaranteed.
 
-1. Allow **status notifications** when prompted. They provide an ongoing status and Stop action. Background mode requires notifications to be enabled for its channel.
-2. Turn on **Enable actions**, then **Use in other apps**. No capture timer is needed.
-3. Press Home, use another app with the phone unlocked, and double press to toggle the flashlight. Return to inspect the last 16 gesture results.
-4. Tap **Stop** in the notification, turn off either switch, or use **Stop background control** in the app to stop monitoring and turn off a light last enabled by this app. On Android versions that allow dismissing ongoing notifications, dismissing it also stops control.
+Only the confirmed key enters background recognition. Raw events are kept only during a visible 15-second capture. A consumed DOWN keeps its decision through repeats and the matching UP, even if monitoring stops during a hold.
 
-The system-bound accessibility service owns the torch controller using an application context. The activity can close without releasing that controller. No extra foreground service, wake lock, continuous polling, battery-optimization exemption, camera opening, or automatic restart is added. Version 0.4.1 makes at most five short state checks during a wake transition to handle keyguard dismissal arriving after SCREEN_ON; it stops checking once unlocked, stopped, or asleep again.
+The torch API needs no Camera permission on stock Android. The app never opens a camera or records media. Torch errors report busy or unavailable hardware without retrying in a loop.
 
-Screen off or lock pauses background recognition, clears pending gestures, and turns off a light last enabled by the app. Background mode stays armed and resumes after unlocking. Locked and screen-off button actions are deliberately disabled. Mode and action settings are process-local and reset off after service disconnection, force-stop, process death, reboot, or app update. Android/OEM service lifecycle behavior still needs physical testing; no guarantee of uninterrupted execution is made.
-
-Only the confirmed Essential key enters background recognition. Raw hardware events are retained only during a visible 15-second diagnostic capture, never continuously in other apps. Stopping or clearing diagnostics stops the current monitoring mode. A consumed DOWN retains the same consumption decision through repeats and its matching UP, even if monitoring stops during a hold; filtering may briefly remain enabled to finish that pair, with actions disabled.
-
-The torch API does not require Camera permission on stock Android. Version 0.4.0 removes the earlier Camera permission and permission request. The app does not open a camera or record media. Torch callbacks report actual state; busy/unavailable hardware is reported without retry loops. OEM restrictions, if any, must be checked on the phone rather than bypassed.
-
-The existing [UI specification](UI-SPEC.md) describes a possible future app, not the current feature set.
-
-The user's full timestamped [reference-video transcript](docs/reference/essential-remapper-transcript.txt) is saved verbatim. See [reference notes](docs/reference/README.md) for provenance and the distinction between product inspiration and verified Android behavior.
+The UI is one diagnostic screen using Material 3 Expressive. Change the palette, typography, or shapes in `app/src/main/java/org/nothingessential/detector/ui/theme/Theme.kt`. [UI-SPEC.md](UI-SPEC.md) is a future design reference, not this build.
 
 ## Stack
 
-Kotlin, Jetpack Compose Material 3 Expressive (`material3` 1.5.0-beta02), an Android AccessibilityService, and an in-memory StateFlow. Android 12 / API 31 or later, compile SDK 37, target SDK 36, JDK 17. AGP 9.4.1 with built-in Kotlin; Compose compiler plugin 2.4.21; Gradle wrapper 9.7.1 with a pinned distribution checksum. No root, Shizuku, ADB client, database, analytics, or custom fonts in the app.
+Kotlin, Jetpack Compose with Material 3 Expressive (`material3` 1.5.0-beta02), AccessibilityService, and in-memory StateFlow. Android 12 / API 31+, compile SDK 37, target SDK 36, JDK 17. AGP 9.4.1, Compose compiler 2.4.21, Gradle 9.7.1 with a pinned checksum. No root, Shizuku, ADB client, database, analytics, or custom fonts.
 
-The UI theme lives in `app/src/main/java/org/nothingessential/detector/ui/theme/Theme.kt`. It uses `MaterialExpressiveTheme` with a neutral light/dark baseline, so standard controls inherit the expressive shape and motion defaults. Change the palette, typography, or shapes there to apply a custom design instead of styling individual controls.
+The 2026.09.00 BOM pins Material 3 1.4.0, so the build pins `1.5.0-beta02` for the expressive components. That dependency is beta.
 
-## Permission model
+## Permissions
 
-The accessibility service is protected by Android's `BIND_ACCESSIBILITY_SERVICE` permission. The source manifest requests only `POST_NOTIFICATIONS` for opt-in background status on Android 13+. It requests no Camera, internet, storage, screenshot, or screen-content access. AndroidX adds an app-specific signature permission for internal receiver protection. Notification Stop uses an immutable PendingIntent targeting a non-exported receiver.
+The manifest asks only for `POST_NOTIFICATIONS`, for the optional background status. It does not ask for Camera, internet, storage, screenshots, or screen content. The accessibility service uses `BIND_ACCESSIBILITY_SERVICE`; the notification Stop receiver is not exported.
 
-Key filtering runs only when an unlocked monitoring mode is active, except for finishing an already consumed press/release pair. No accessibility window events, gesture injection, or overlays are requested. Every action rechecks that the screen is interactive and the keyguard/device is unlocked. Screen-state broadcasts reset pending recognition; no background action is allowed to cross a lock boundary.
-Before opening accessibility settings, the app explains exactly what metadata it displays and asks the user to continue. The service can be turned off in Android settings. It is correctly declared as `isAccessibilityTool="false"`.
+Key filtering runs only while an unlocked monitoring mode is active, plus the tail of an already consumed pair. The service does not request window events, gesture injection, or overlays. Every action checks screen, keyguard, and device state. The manifest declares `isAccessibilityTool="false"`.
 
-## Build and physical-device test
+The app explains its access in a dialog before opening Android accessibility settings.
 
-No emulator is needed. APK building, installation, and hardware testing use the connected CMF Phone 2 Pro.
+## Build and test
 
-Current device experiment: the user authorized disabling stock Essential Space for Android user 0 after it still opened during the flashlight test. See [docs/DEVICE-TEST.md](docs/DEVICE-TEST.md) for the exact change and restore command. The app itself does not change system packages.
+1. Open the project in Android Studio or set `ANDROID_HOME`. Use SDK platform 37 and JDK 17.
+2. Build: `./gradlew :app:assembleDebug`
+3. Connect the CMF over USB, enable USB debugging, and authorize the computer.
+4. Check `adb devices -l`, then install: `adb -s SERIAL install -r app/build/outputs/apk/debug/app-debug.apk`
+5. Launch **Nothing Essential Detector**, read the disclosure, and enable **Essential button detector** in accessibility settings.
+6. Check **Accessibility on**, start a capture, and try single, double, and long presses. Power and volume should behave normally.
+7. Check that capture stops when you leave the app and after 15 seconds.
 
-1. Open this folder in Android Studio or set `ANDROID_HOME` to an installed Android SDK. Install SDK platform 37 if needed. Use JDK 17.
-2. When ready, build with `./gradlew :app:assembleDebug`.
-3. Connect the phone by USB, enable USB debugging, and authorize this computer on the phone.
-4. Check `adb devices -l`. If multiple devices are attached, select the intended serial explicitly.
-5. Install with `adb -s SERIAL install -r app/build/outputs/apk/debug/app-debug.apk`.
-6. Launch **Nothing Essential Detector**. Read the disclosure and enable **Essential button detector** in Android accessibility settings. If Android blocks a sideloaded app's accessibility setting, review the app's provenance before manually allowing restricted settings in its App info menu. The app does not bypass this protection.
-7. Return to the detector. Confirm **Service connected**, start capture, then try a single press, two quick presses, and a hold over 600 ms. Check the latest gesture and history. Other keys should not produce gesture results.
-8. Confirm ordinary power and volume behavior remains unchanged. Confirm capture stops when leaving the app and after 15 seconds.
+Host checks: `./gradlew :app:testDebugUnitTest`
 
-Host unit checks, which do not run an emulator or produce an installable APK:
+## Validation
 
-```sh
-./gradlew :app:testDebugUnitTest
-```
+Host checks cannot prove the CMF firmware delivers the key. Only the phone can. No emulator was used.
+
+| Version | Host checks | Device evidence |
+| --- | --- | --- |
+| 0.2.0 | 19 tests, build | A001: single, double, long; timing screenshots |
+| 0.3.0 | 27 tests, build | A001: foreground flashlight after Essential Space disabled |
+| 0.4.0 | 35 tests, build | A001: background gestures, 8 double presses; notification Stop not yet checked |
+| 0.4.1 | 49 tests, build | A001: pause/resume, notification Stop, light off |
+
+Not covered: long-term service survival, lock-screen actions, other phones or firmware. Background and lock behavior were not tested in 0.3.0. See [docs/DEVICE-TEST.md](docs/DEVICE-TEST.md) for the package change and restore command. The app never changes system packages.
 
 ## If no event arrives
 
-Do not assume accessibility access is broken or change packages automatically. The following need to be distinguished on the actual phone:
+Check that accessibility is connected and capture is running. Another service may own key filtering, Nothing OS may intercept the button, or the firmware may use a mapping the filter drops. Record the Android and Nothing OS versions before changing anything. Do not disable or uninstall system packages.
 
-- Accessibility service not connected, or capture already stopped.
-- Another service requesting key filtering. Android does not guarantee delivery to every enabled service.
-- Nothing OS intercepting the Essential button before this service sees it.
-- The button opening Essential Space and sending this activity to the background, which intentionally stops capture.
-- A firmware-specific key mapping excluded by the prototype's privacy filter.
-
-First record the phone's Android / Nothing OS version and inspect the stock behavior. Community documentation names `com.nothing.ntessentialspace` and `com.nothing.ntessentialrecorder`, but those names and their current enabled states must be verified on this phone before considering any change. This prototype contains no package-disabling or shell-execution code. Any later reversible experiment must include restoring the original package states; do not uninstall system packages.
-
-## Research and verification
-
-See [docs/RESEARCH.md](docs/RESEARCH.md) for the Android contracts, source links, and remaining device-specific uncertainties. Unit tests cover capture boundaries and privacy gating. Successful unit checks cannot establish that CMF firmware delivers the Essential key. That requires the physical phone.
-
-Initial validation on 2026-10-23: `:app:testDebugUnitTest` passed all six tests and compiled the Android/Kotlin sources. XML permission-boundary checks also passed. No emulator, installable APK, or device test was run.
-
-Version 0.2.0 validation on the same date: `:app:testDebugUnitTest :app:assembleDebug` passed all 19 unit tests and produced a debug APK, installed successfully on the connected A001. The user then performed single, double, and long presses; screenshots confirmed the expected gesture and timing for each, with no extra single after the double or long. See the measured results in [docs/RESEARCH.md](docs/RESEARCH.md). This verifies these foreground examples on one phone, not background, lock-screen, or other firmware behavior. No emulator or system-package changes were used by the development workflow.
-
-Version 0.3.0 host validation on the same date: all 27 unit tests passed and the debug APK built successfully. New tests cover consistent press/release consumption, repeats, unrelated keys, device identity, and capture ending during a hold. Source permission checks confirm Camera is the only requested app permission and screen-content access remains disabled. After reconnecting the phone, version 0.3.0 installed and opened successfully on A001. The initial test briefly illuminated the light but still opened Essential Space. After the user authorized disabling that package, the user confirmed successful foreground flashlight behavior; screenshots confirmed the detector remained visible with the service connected and actions enabled. See [docs/DEVICE-TEST.md](docs/DEVICE-TEST.md) for the results, limits, and restore command. Background and lock-screen use remain untested.
-
-Version 0.4.0 host validation on 2026-10-23: all 35 unit tests passed and `:app:assembleDebug` succeeded. Source checks confirm notifications are the only requested app permission, the Stop receiver is not exported, and window-content retrieval is disabled. Version 0.4.0 installed successfully on A001; the accessibility service process is running. The phone was dozing at inspection, and notification permission is not yet granted. The user subsequently confirmed background control works. Retained history shows eight double presses, including events at 15187 and 16024 ms beyond the diagnostic timeout; inspection found both controls off and flashlight status off. Dedicated notification Stop and lock/pause/resume checks remain pending. See docs/DEVICE-TEST.md for the evidence and limits. No emulator or further system-package changes were used.
-
-Version 0.4.1 fixes background mode staying paused when SCREEN_ON precedes keyguard dismissal without a later USER_PRESENT update. Its regression failed twice before the fix; all 49 host tests now pass, including the real Handler-based monitor under Robolectric on the JVM, without an emulator. The APK installed successfully. On the physical CMF, a screen-off/wake cycle paused and resumed control with no stale gesture, and the user's notification Stop disabled both controls, left the light off, and removed the notification. Long-term service survival and lock-screen actions remain outside these results.
-
-Read-only diagnostics, which avoid UI automation interrupting accessibility:
-
-```sh
-python3 scripts/check-device-state.py --serial SERIAL
-python3 scripts/check-device-state.py --serial SERIAL --expect stopped
-```
-
-For an explicitly armed, unlocked device, `--wake-cycle` turns the screen off and on and verifies pause/resume without rearming or bypassing authentication. It checks state transitions and stale gesture counts; it does not physically measure light output.
+[docs/RESEARCH.md](docs/RESEARCH.md) has the Android contracts and open questions.
 
 ## License
 
-Original project code is licensed under [GPL-3.0-only](LICENSE). Gradle-generated wrapper files retain their own license notices. Dependencies retain their respective licenses.
-
+Original code is GPL-3.0-only. Wrapper files retain their notices. Dependencies retain their licenses.
