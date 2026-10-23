@@ -20,6 +20,20 @@ After that change, the user reported that the flashlight experiment worked corre
 
 This passes the current foreground flashlight experiment on this phone with Essential Space disabled. It does not establish background, lock-screen, reboot, long-term reliability, or behavior with stock Essential Space enabled.
 
+## Version 0.4.0 background test procedure
+
+Version 0.4.0 installed on A001 after 35 host unit tests passed. The Android-bound accessibility service is running. Notification permission is initially denied, background control is off by default, and Camera permission is no longer declared. Essential Space remains disabled; the recorder package has not been changed by this workflow.
+
+Physical checks still pending:
+
+1. Unlock, open the detector, allow status notifications, then enable actions and **Use in other apps**.
+2. Confirm the ongoing notification appears. Press Home, use another app, and double press the Essential button to toggle on, then off. Wait beyond 15 seconds and repeat to check independence from diagnostic capture.
+3. Use the notification's **Stop** action. Check the light is off, the notification is removed, and further presses do not trigger this app's actions.
+4. Reenable background mode, then turn off/lock the screen. Verify no button action runs and any app-enabled light turns off. Unlock and verify a fresh double press works, without any stale gesture from before lock.
+5. Confirm ordinary keys and the Camera app remain usable; camera resource conflicts should show an unavailable status rather than crash or retry continuously.
+
+These checks are a protocol, not completed results. No service persistence or lock-screen action is claimed from the host tests alone.
+
 To restore the original package state on the same phone and Android user:
 
 ```sh

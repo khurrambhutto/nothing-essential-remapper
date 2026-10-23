@@ -13,86 +13,136 @@ data class DetectorState(
     val observations: List<KeyObservation> = emptyList(),
     val gestures: List<GestureObservation> = emptyList(),
     val actionsEnabled: Boolean = false,
+    val backgroundEnabled: Boolean = false,
+    val unlocked: Boolean = false,
 )
 
-/** Process-local memory only. Activity, service callbacks, and timeout run on the main thread. */
+/** Main-thread runtime shared by the activity and system-bound accessibility service. */
 object CaptureMonitor {
     private val handler = Handler(Looper.getMainLooper())
     private val session = CaptureSession(SystemClock::uptimeMillis)
     private val recognizer = GestureRecognizer(SystemClock::uptimeMillis)
-    private var captureStartedAt = 0L
-    private var gestures: List<GestureObservation> = emptyList()
     private val mutableState = MutableStateFlow(DetectorState())
     val state = mutableState.asStateFlow()
-    val mayInterceptButton: Boolean
-        get() = foreground && session.isCapturing && mutableState.value.actionsEnabled
     private var foreground = false
+    private var startedAt = 0L
+    private var gestures: List<GestureObservation> = emptyList()
     private var toggleFlashlight: (() -> Unit)? = null
     private var stopFlashlight: (() -> Unit)? = null
     private var setKeyFiltering: ((Boolean) -> Unit)? = null
+    private var checkUnlocked: (() -> Boolean)? = null
+    private var canNotify: (() -> Boolean)? = null
     private val timeout = Runnable { stop() }
     private val gestureTick = Runnable {
-        if (foreground && session.isCapturing) {
+        refreshEnvironment()
+        if (policy.canRecognize) {
             recordGestures(recognizer.advance())
             publish()
             scheduleGestureTick()
-        } else {
-            recognizer.cancel()
-        }
+        } else recognizer.cancel()
     }
 
-    fun connected(setFiltering: (Boolean) -> Unit) {
+    private val policy: MonitoringPolicy
+        get() = mutableState.value.let {
+            MonitoringPolicy(foreground, it.unlocked, session.isCapturing, it.backgroundEnabled, it.actionsEnabled)
+        }
+    val mayInterceptButton: Boolean get() = policy.canAct
+
+    fun connected(
+        setFiltering: (Boolean) -> Unit,
+        unlocked: () -> Boolean,
+        notificationsAllowed: () -> Boolean,
+        toggle: () -> Unit,
+        cleanup: () -> Unit,
+    ) {
         setKeyFiltering = setFiltering
-        setFiltering(false)
+        checkUnlocked = unlocked
+        canNotify = notificationsAllowed
+        toggleFlashlight = toggle
+        stopFlashlight = cleanup
         mutableState.value = mutableState.value.copy(serviceConnected = true)
+        refreshEnvironment()
+        setFiltering(false)
     }
 
     fun disconnected() {
-        stop()
+        setActionsEnabled(false)
         setKeyFiltering = null
-        mutableState.value = mutableState.value.copy(serviceConnected = false)
+        toggleFlashlight = null
+        stopFlashlight = null
+        checkUnlocked = null
+        canNotify = null
+        mutableState.value = mutableState.value.copy(serviceConnected = false, unlocked = false)
+    }
+
+    fun refreshEnvironment() {
+        val unlocked = checkUnlocked?.invoke() == true
+        if (!unlocked && mutableState.value.unlocked) {
+            handler.removeCallbacks(timeout)
+            handler.removeCallbacks(gestureTick)
+            recognizer.cancel()
+            session.stop()
+            stopFlashlight?.invoke()
+        }
+        mutableState.value = mutableState.value.copy(unlocked = unlocked)
+        if (mutableState.value.backgroundEnabled && canNotify?.invoke() != true) {
+            setActionsEnabled(false)
+        }
+        publish()
     }
 
     fun setForeground(value: Boolean) {
         foreground = value
-        if (!value) {
-            stop()
-            mutableState.value = mutableState.value.copy(actionsEnabled = false)
+        refreshEnvironment()
+        if (!value && !mutableState.value.backgroundEnabled) {
+            setActionsEnabled(false)
+        } else if (!value) {
+            // Leave only the confirmed-key background listener, not raw diagnostics.
+            handler.removeCallbacks(timeout)
+            session.stop()
+            publish()
         }
-    }
-
-    fun attachFlashlight(toggle: (() -> Unit)?, cleanup: (() -> Unit)?) {
-        toggleFlashlight = toggle
-        stopFlashlight = cleanup
     }
 
     fun setActionsEnabled(enabled: Boolean) {
         stop()
         mutableState.value = mutableState.value.copy(
-            actionsEnabled = enabled && foreground && toggleFlashlight != null,
+            actionsEnabled = enabled && foreground && mutableState.value.unlocked && toggleFlashlight != null,
         )
     }
 
+    fun setBackgroundEnabled(enabled: Boolean) {
+        val eligible = foreground && mutableState.value.serviceConnected && mutableState.value.actionsEnabled &&
+            checkUnlocked?.invoke() == true && canNotify?.invoke() == true
+        stop()
+        if (enabled && eligible) {
+            startedAt = SystemClock.uptimeMillis()
+            gestures = emptyList()
+            session.clear()
+            mutableState.value = mutableState.value.copy(backgroundEnabled = true)
+            publish()
+        }
+    }
+
     fun start() {
-        if (!foreground || !mutableState.value.serviceConnected) return
-        handler.removeCallbacks(gestureTick)
-        recognizer.cancel()
+        refreshEnvironment()
+        if (!foreground || !mutableState.value.serviceConnected || !mutableState.value.unlocked) return
+        stop()
         gestures = emptyList()
-        captureStartedAt = SystemClock.uptimeMillis()
+        startedAt = SystemClock.uptimeMillis()
         session.start()
         publish()
-        setKeyFiltering?.invoke(true)
-        handler.removeCallbacks(timeout)
         handler.postDelayed(timeout, 15_000L)
     }
 
+    /** Stops either mode; the user may explicitly start a new one. */
     fun stop() {
         handler.removeCallbacks(timeout)
         handler.removeCallbacks(gestureTick)
         recognizer.cancel()
         session.stop()
+        mutableState.value = mutableState.value.copy(backgroundEnabled = false)
         stopFlashlight?.invoke()
-        setKeyFiltering?.invoke(false)
         publish()
     }
 
@@ -104,55 +154,43 @@ object CaptureMonitor {
     }
 
     fun observe(
-        keyCode: Int,
-        scanCode: Int,
-        keyName: String,
-        edge: KeyEdge,
-        repeatCount: Int,
-        isTypingKey: Boolean,
-        isVirtual: Boolean,
-        isExcludedKey: Boolean,
-        isCanceled: Boolean = false,
+        keyCode: Int, scanCode: Int, keyName: String, edge: KeyEdge, repeatCount: Int,
+        isTypingKey: Boolean, isVirtual: Boolean, isExcludedKey: Boolean, isCanceled: Boolean = false,
     ) {
-        if (!foreground || !session.isCapturing) return
-        if (session.observe(
-                keyCode, scanCode, keyName, edge, repeatCount,
-                isTypingKey, isVirtual, isExcludedKey,
-            )
-        ) {
-            if (CmfTestKey.matches(keyCode, scanCode)) {
-                if (isCanceled) recognizer.cancel()
-                else recordGestures(recognizer.onEdge(edge, repeatCount))
-                scheduleGestureTick()
-            }
-            publish()
+        refreshEnvironment()
+        if (!policy.canRecognize || isTypingKey || isVirtual || isExcludedKey) return
+        if (policy.canRecordRaw) {
+            session.observe(keyCode, scanCode, keyName, edge, repeatCount, false, false, false)
         }
+        if (CmfTestKey.matches(keyCode, scanCode)) {
+            if (isCanceled) recognizer.cancel()
+            else recordGestures(recognizer.onEdge(edge, repeatCount))
+            scheduleGestureTick()
+        }
+        publish()
     }
 
     private fun recordGestures(types: List<GestureType>) {
         for (type in types) {
-            gestures = (listOf(GestureObservation(
-                type, SystemClock.uptimeMillis() - captureStartedAt,
-            )) + gestures).take(16)
-            if (type == GestureType.DOUBLE_PRESS && foreground && session.isCapturing &&
-                mutableState.value.actionsEnabled
-            ) toggleFlashlight?.invoke()
+            gestures = (listOf(GestureObservation(type, SystemClock.uptimeMillis() - startedAt)) + gestures).take(16)
+            // Recheck lock state at execution, including delayed single/long callbacks.
+            if (type == GestureType.DOUBLE_PRESS && policy.canAct && checkUnlocked?.invoke() == true) {
+                toggleFlashlight?.invoke()
+            }
         }
     }
 
     private fun scheduleGestureTick() {
         handler.removeCallbacks(gestureTick)
-        recognizer.nextDeadlineMs?.let { deadline ->
-            handler.postDelayed(gestureTick, (deadline - SystemClock.uptimeMillis()).coerceAtLeast(1L))
+        recognizer.nextDeadlineMs?.let {
+            handler.postDelayed(gestureTick, (it - SystemClock.uptimeMillis()).coerceAtLeast(1L))
         }
     }
 
     private fun publish() {
         mutableState.value = mutableState.value.copy(
-            isCapturing = session.isCapturing,
-            observations = session.observations,
-            gestures = gestures,
+            isCapturing = session.isCapturing, observations = session.observations, gestures = gestures,
         )
+        setKeyFiltering?.invoke(policy.canRecognize)
     }
 }
-

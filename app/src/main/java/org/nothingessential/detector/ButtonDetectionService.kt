@@ -5,21 +5,71 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
+import android.app.KeyguardManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
+import android.os.PowerManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 class ButtonDetectionService : AccessibilityService() {
     private val consumption = KeyConsumptionGate()
     private var captureRequestsFiltering = false
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private lateinit var flashlight: FlashlightController
+    private lateinit var notification: BackgroundModeNotification
+    private var receiverRegistered = false
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) { CaptureMonitor.refreshEnvironment() }
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        CaptureMonitor.connected { enabled ->
+        flashlight = FlashlightRuntime.get(this)
+        flashlight.activate()
+        notification = BackgroundModeNotification(this)
+        CaptureMonitor.connected(setFiltering = { enabled ->
             captureRequestsFiltering = enabled
             if (!enabled) consumption.discardPassThroughPresses()
             updateFiltering()
+        }, unlocked = {
+            val keyguard = getSystemService(KeyguardManager::class.java)
+            getSystemService(PowerManager::class.java).isInteractive &&
+                !keyguard.isKeyguardLocked && !keyguard.isDeviceLocked
+        }, notificationsAllowed = notification::allowed,
+            toggle = flashlight::toggle, cleanup = flashlight::turnOffOwnedLight)
+        if (!receiverRegistered) {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_USER_PRESENT)
+            }
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(screenReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            else @Suppress("DEPRECATION") registerReceiver(screenReceiver, filter)
+            receiverRegistered = true
+        }
+        scope.launch {
+            CaptureMonitor.state.map { it.backgroundEnabled to it.unlocked }.distinctUntilChanged()
+                .collect { notification.update(CaptureMonitor.state.value) }
+        }
+        scope.launch {
+            flashlight.state.collect {
+                if (!it.available && CaptureMonitor.state.value.actionsEnabled) CaptureMonitor.setActionsEnabled(false)
+            }
         }
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
+        CaptureMonitor.refreshEnvironment()
+        if (!CaptureMonitor.state.value.isCapturing && !CmfTestKey.matches(event.keyCode, event.scanCode)) return false
         val edge = when (event.action) {
             KeyEvent.ACTION_DOWN -> KeyEdge.DOWN
             KeyEvent.ACTION_UP -> KeyEdge.UP
@@ -77,6 +127,10 @@ class ButtonDetectionService : AccessibilityService() {
     override fun onDestroy() {
         CaptureMonitor.disconnected()
         consumption.reset()
+        scope.cancel()
+        if (receiverRegistered) unregisterReceiver(screenReceiver)
+        if (::flashlight.isInitialized) flashlight.deactivate()
+        if (::notification.isInitialized) notification.cancel()
         super.onDestroy()
     }
 
@@ -94,4 +148,3 @@ class ButtonDetectionService : AccessibilityService() {
         )
     }
 }
-

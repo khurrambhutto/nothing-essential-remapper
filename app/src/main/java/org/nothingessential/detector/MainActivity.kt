@@ -5,6 +5,7 @@ import android.content.Intent
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.content.pm.PackageManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -30,7 +31,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,13 +40,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 class MainActivity : ComponentActivity() {
     private lateinit var flashlight: FlashlightController
+    private var notificationsAllowed by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        flashlight = FlashlightController(this)
+        flashlight = FlashlightRuntime.get(this)
         enableEdgeToEdge()
         setContent {
             MaterialTheme(
@@ -56,7 +60,7 @@ class MainActivity : ComponentActivity() {
                     surface = Color(0xFFF7F7F7),
                 ),
             ) {
-                DetectorScreen(flashlight) {
+                DetectorScreen(flashlight, notificationsAllowed, ::refreshNotifications) {
                     startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                 }
             }
@@ -66,32 +70,36 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         flashlight.activate()
-        CaptureMonitor.attachFlashlight(flashlight::toggle, flashlight::turnOffOwnedLight)
+        refreshNotifications()
         CaptureMonitor.setForeground(true)
     }
 
     override fun onPause() {
         CaptureMonitor.setForeground(false)
-        CaptureMonitor.attachFlashlight(null, null)
-        flashlight.deactivate()
+        if (!CaptureMonitor.state.value.serviceConnected) flashlight.deactivate()
         super.onPause()
+    }
+
+    private fun refreshNotifications() {
+        notificationsAllowed = BackgroundModeNotification(this).allowed()
+        CaptureMonitor.refreshEnvironment()
     }
 }
 
 @Composable
-private fun DetectorScreen(flashlight: FlashlightController, openAccessibilitySettings: () -> Unit) {
+private fun DetectorScreen(
+    flashlight: FlashlightController,
+    notificationsAllowed: Boolean,
+    refreshNotifications: () -> Unit,
+    openAccessibilitySettings: () -> Unit,
+) {
     val state by CaptureMonitor.state.collectAsState()
     val flash by flashlight.state.collectAsState()
-    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        flashlight.activate()
+    val context = LocalContext.current
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        refreshNotifications()
     }
     var showDisclosure by rememberSaveable { mutableStateOf(false) }
-
-    LaunchedEffect(flash.available, flash.permissionGranted) {
-        if ((!flash.available || !flash.permissionGranted) && CaptureMonitor.state.value.actionsEnabled) {
-            CaptureMonitor.setActionsEnabled(false)
-        }
-    }
 
     Scaffold { insets ->
         LazyColumn(
@@ -101,7 +109,7 @@ private fun DetectorScreen(flashlight: FlashlightController, openAccessibilitySe
         ) {
             item {
                 Text("Essential button", style = MaterialTheme.typography.headlineLarge)
-                Text("Flashlight prototype · v0.3.0", style = MaterialTheme.typography.titleMedium)
+                Text("Background prototype · v0.4.0", style = MaterialTheme.typography.titleMedium)
                 Text("${Build.MANUFACTURER} ${Build.MODEL} • Android ${Build.VERSION.RELEASE}")
             }
             item {
@@ -109,26 +117,50 @@ private fun DetectorScreen(flashlight: FlashlightController, openAccessibilitySe
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("Double press → flashlight", style = MaterialTheme.typography.titleLarge)
                         Text(flash.message)
-                        Text("Android requires camera permission for flashlight access. " +
-                            "This app uses only the torch API; it does not take photos or record video.")
-                        if (!flash.permissionGranted) {
-                            OutlinedButton(onClick = { cameraPermission.launch(Manifest.permission.CAMERA) }) {
-                                Text("Allow flashlight access")
-                            }
-                            Text("If permission is denied permanently, allow Camera in Android's App info permissions.")
-                        }
+                        Text("Uses the torch API. No Camera permission, photos, or video recording.")
                         Text("Enable actions")
                         Switch(
                             checked = state.actionsEnabled,
-                            enabled = state.actionsEnabled || (flash.available && flash.permissionGranted && !flash.busy),
+                            modifier = Modifier.semantics { contentDescription = "Enable actions" },
+                            enabled = state.actionsEnabled || (state.serviceConnected && state.unlocked && flash.available && !flash.busy),
                             onCheckedChange = { CaptureMonitor.setActionsEnabled(it) },
                         )
-                        Text("Off by default. Enable, then start capture. Only double press toggles " +
-                            "the flashlight; single and long press stay diagnostic. " +
-                            "While enabled, this app consumes the test button's presses and releases " +
-                            "during capture to try to prevent Essential Space opening.")
-                        Text("Changing this switch stops capture. Leaving this screen disables actions. " +
-                            "Stopping capture turns off a light this app enabled.")
+                        Text("Only double press toggles the flashlight. Single and long press display results. " +
+                            "Changing this switch stops all monitoring and turns off a light this app enabled.")
+                    }
+                }
+            }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Use in other apps", style = MaterialTheme.typography.titleLarge)
+                        Text(when {
+                            state.backgroundEnabled && !state.unlocked -> "Paused while screen is off or locked"
+                            state.backgroundEnabled -> "Background control is on"
+                            else -> "Background control is off"
+                        })
+                        if (!notificationsAllowed) {
+                            Text("Allow status notifications to enable background control and its Stop button.")
+                            OutlinedButton(onClick = {
+                                if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                                    notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
+                                }
+                            }) { Text("Allow status notifications") }
+                        }
+                        Switch(
+                            modifier = Modifier.semantics { contentDescription = "Use in other apps" },
+                            checked = state.backgroundEnabled,
+                            enabled = state.backgroundEnabled || (notificationsAllowed && state.actionsEnabled && flash.available && state.unlocked),
+                            onCheckedChange = { CaptureMonitor.setBackgroundEnabled(it) },
+                        )
+                        Text("Enable actions, then turn this on. Leave the app and double press while " +
+                            "the phone is unlocked. No capture timer is needed. Only the confirmed " +
+                            "Essential key is recognized; raw key logging stays off.")
+                        Text("Screen off or lock pauses actions, clears unfinished gestures, and turns " +
+                            "off a light this app enabled. Unlock resumes background control. " +
+                            "Use Stop in the notification to disable it. Service restart or reboot leaves it off.")
                     }
                 }
             }
@@ -148,21 +180,22 @@ private fun DetectorScreen(flashlight: FlashlightController, openAccessibilitySe
             }
             item {
                 Text(
-                    if (state.isCapturing) "Listening for 15 seconds…" else "Ready to capture",
+                    if (state.backgroundEnabled) "Background control enabled"
+                    else if (state.isCapturing) "Listening for 15 seconds…" else "Ready to capture",
                     style = MaterialTheme.typography.titleLarge,
                 )
-                Text("Start capture, then press and release only the physical Essential button. " +
+                Text("For a short foreground diagnostic, start capture and press the Essential button. " +
                     "Try a single press, a quick double press, or hold for 600 ms. " +
                     if (state.actionsEnabled) "Double press will toggle the flashlight during capture."
                     else "Actions are off; button events pass through normally.")
                 Button(
                     enabled = state.serviceConnected,
-                    onClick = { if (state.isCapturing) CaptureMonitor.stop() else CaptureMonitor.start() },
+                    onClick = { if (state.isCapturing || state.backgroundEnabled) CaptureMonitor.stop() else CaptureMonitor.start() },
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 ) {
-                    Text(if (state.isCapturing) "Stop capture" else "Start 15-second capture")
+                    Text(if (state.backgroundEnabled) "Stop background control" else if (state.isCapturing) "Stop capture" else "Start 15-second capture")
                 }
-                TextButton(onClick = { CaptureMonitor.clear() }) { Text("Clear results") }
+                TextButton(onClick = { CaptureMonitor.clear() }) { Text("Clear results and stop") }
             }
             item {
                 Card(Modifier.fillMaxWidth()) {
@@ -205,7 +238,8 @@ private fun DetectorScreen(flashlight: FlashlightController, openAccessibilitySe
                 }
             }
             item {
-                Text("Capture stops after 15 seconds or when you leave this screen. " +
+                Text("Raw capture stops after 15 seconds or when you leave this screen. " +
+                    "Background control continues only when explicitly enabled, with an unlocked screen. " +
                     "Typing, virtual, volume, power, and common navigation keys are ignored. " +
                     "Events stay in memory until cleared or the process ends. " +
                     "No internet access, screen reading, or system-package changes.")
@@ -221,8 +255,10 @@ private fun DetectorScreen(flashlight: FlashlightController, openAccessibilitySe
                 Text("Android accessibility access lets this prototype receive hardware key events. " +
                     "During a capture it displays non-typing key codes, scan codes, press/release, " +
                     "repeat counts, and relative times. It does not request screen content, " +
-                    "store files, or send data. Filtering is requested only during a foreground capture. " +
-                    "With Enable actions on, it consumes the test button's events during capture " +
+                    "store files, or send data. Optional background control recognizes only the " +
+                    "confirmed Essential key while using other apps and pauses on screen off or lock. " +
+                    "It has an ongoing status notification with Stop. " +
+                    "With Enable actions on, it consumes the test button's events in either mode " +
                     "and uses double press to toggle the flashlight. A matching release is still " +
                     "consumed if capture ends while the button is held. " +
                     "You can disable the service in Android settings at any time.")
@@ -238,4 +274,3 @@ private fun DetectorScreen(flashlight: FlashlightController, openAccessibilitySe
         )
     }
 }
-

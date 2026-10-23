@@ -1,6 +1,5 @@
 <resources>
     <string name="app_name">Nothing Essential Detector</string>
     <string name="service_name">Essential button detector</string>
-    <string name="service_description">Reports non-typing hardware key codes during a 15-second capture while the detector is open. With Enable actions on, consumes the test button events and toggles the flashlight on double press. Finishes consuming a matching release if capture ends during a hold. Does not read screen content, store files, or send data.</string>
+    <string name="service_description">Recognizes Essential button gestures. Optional background mode uses only the confirmed Essential key while the screen is unlocked, with a status notification and Stop button. Double press can toggle the flashlight. Raw diagnostic capture runs only while the detector is open. Finishes consuming matching releases. Does not read screen content, store files, or send data.</string>
 </resources>
-

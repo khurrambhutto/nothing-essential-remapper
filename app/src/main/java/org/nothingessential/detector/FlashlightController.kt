@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package org.nothingessential.detector
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -13,11 +11,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 data class FlashlightState(
-    val permissionGranted: Boolean = false,
     val available: Boolean = false,
     val isOn: Boolean = false,
     val busy: Boolean = false,
-    val message: String = "Allow camera permission to control the flashlight.",
+    val message: String = "Checking flashlight…",
 )
 
 /** Uses torch APIs only. Never opens a camera, captures an image, or stores media. */
@@ -52,11 +49,6 @@ class FlashlightController(private val context: Context) {
 
     fun activate() {
         active = true
-        val granted = context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        if (!granted) {
-            mutableState.value = FlashlightState()
-            return
-        }
         if (registered) return
         try {
             cameraId = manager.cameraIdList.firstOrNull { id ->
@@ -65,7 +57,6 @@ class FlashlightController(private val context: Context) {
                     info.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK
             }
             mutableState.value = FlashlightState(
-                permissionGranted = true,
                 message = if (cameraId == null) "No rear flashlight found." else "Checking flashlight…",
             )
             if (cameraId != null) {
@@ -75,7 +66,7 @@ class FlashlightController(private val context: Context) {
         } catch (_: CameraAccessException) {
             fail("Camera service unavailable. Reopen the app to retry.")
         } catch (_: SecurityException) {
-            mutableState.value = FlashlightState()
+            fail("This device restricts torch access. Background support needs a device-specific check.")
         } catch (_: IllegalArgumentException) {
             fail("The camera configuration changed. Reopen the app to retry.")
         }
@@ -84,7 +75,7 @@ class FlashlightController(private val context: Context) {
     fun toggle() {
         val current = mutableState.value
         val id = cameraId ?: return
-        if (!active || !current.permissionGranted || !current.available || current.busy) return
+        if (!active || !current.available || current.busy) return
         val desired = !current.isOn
         mutableState.value = current.copy(busy = true, message = "Changing flashlight…")
         try {
@@ -93,7 +84,7 @@ class FlashlightController(private val context: Context) {
         } catch (_: CameraAccessException) {
             fail("Flashlight could not change. Close camera apps and retry.")
         } catch (_: SecurityException) {
-            mutableState.value = FlashlightState(message = "Camera permission was removed. Allow it again in settings.")
+            fail("Android restricted torch access. No camera will be opened to work around it.")
         } catch (_: IllegalArgumentException) {
             fail("This camera no longer provides a flashlight.")
         }
@@ -124,4 +115,10 @@ class FlashlightController(private val context: Context) {
     private fun fail(message: String) {
         mutableState.value = mutableState.value.copy(available = false, busy = false, message = message)
     }
+}
+
+/** Application context avoids retaining an activity while background mode is enabled. */
+object FlashlightRuntime {
+    private var instance: FlashlightController? = null
+    fun get(context: Context): FlashlightController = instance ?: FlashlightController(context.applicationContext).also { instance = it }
 }
